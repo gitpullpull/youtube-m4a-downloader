@@ -65,7 +65,7 @@ def sanitize_filename(filename):
 async def download_audio(url: str):
     """yt-dlpで指定されたURLからm4a音声をダウンロードし、一時ファイルのパスとファイル名を返す"""
     # 一時ディレクトリの存在確認 (Vercelでは /tmp が使えるはず)
-    temp_dir = pathlib.Path(__file__).parent.parent / "tmp"
+    temp_dir = pathlib.Path(__file__).parent.parent.resolve() / "tmp"
     try:
         temp_dir.mkdir(parents=True, exist_ok=True)
         temp_dir = str(temp_dir)  # pathlib.Pathを文字列に変換
