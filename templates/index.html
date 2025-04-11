@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My YouTube m4a Downloader</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            padding: 20px;
+            max-width: 700px;
+            margin: 40px auto;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        p {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #555;
+        }
+        #downloadForm {
+            display: flex;
+            flex-wrap: wrap; /* 小画面での折り返し */
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+        input[type="text"] {
+            flex-grow: 1; /* スペースを埋めるように伸びる */
+            padding: 12px 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+            min-width: 250px; /* 最小幅 */
+            margin-right: 10px;
+             margin-bottom: 10px; /* 折り返し時のマージン */
+        }
+        button {
+            padding: 12px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s ease;
+            display: inline-flex; /* ローダーを隣に表示するため */
+            align-items: center;
+             margin-bottom: 10px; /* 折り返し時のマージン */
+        }
+        button:hover:not(:disabled) {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #a9cce3;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+            display: none; /* 最初は非表示 */
+        }
+        .info { background-color: #eaf2f8; color: #3498db; border: 1px solid #aed6f1; }
+        .success { background-color: #e8f8f5; color: #1abc9c; border: 1px solid #a3e4d7; }
+        .error { background-color: #fdedec; color: #e74c3c; border: 1px solid #f5b7b1; }
+        .loader {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            animation: spin 1.5s linear infinite;
+            display: none; /* Initially hidden */
+            margin-left: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 600px) {
+            #downloadForm {
+                flex-direction: column;
+                align-items: stretch; /* 幅いっぱいに */
+            }
+            input[type="text"] {
+                margin-right: 0;
+                margin-bottom: 15px; /* ボタンとの間隔 */
+            }
+             button {
+                width: 100%; /* 幅いっぱいに */
+                justify-content: center; /* テキストとローダーを中央揃え */
+             }
+        }
+    </style>
+</head>
+<body>
+    <h1>YouTube m4a Downloader (個人用)</h1>
+    <p>自分の投稿した動画のURLを入力してください。</p>
+    <form id="downloadForm">
+        <input type="text" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." required>
+        <button type="submit" id="downloadButton">
+            <span>m4aをダウンロード</span>
+            <div class="loader" id="loader"></div>
+        </button>
+    </form>
+    <div id="status"></div>
+
+    <script>
+        const form = document.getElementById('downloadForm');
+        const urlInput = document.getElementById('youtubeUrl');
+        const button = document.getElementById('downloadButton');
+        const buttonText = button.querySelector('span'); // ボタン内のテキスト要素
+        const statusDiv = document.getElementById('status');
+        const loader = document.getElementById('loader');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const url = urlInput.value.trim();
+
+            if (!url) {
+                showStatus('URLを入力してください。', 'error');
+                return;
+            }
+
+            // クライアントサイドでも簡単なURLチェック
+            if (!/^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/.test(url)) {
+                 showStatus('有効なYouTube動画のURL形式ではありません。', 'error');
+                 return;
+            }
+
+            setLoading(true);
+            showStatus('ダウンロード準備中...', 'info');
+
+            try {
+                // APIエンドポイント (api/main.pyで定義したパス)
+                const apiUrl = `/api/download?url=${encodeURIComponent(url)}`;
+                console.log("Requesting URL:", apiUrl);
+
+                const response = await fetch(apiUrl);
+                console.log("Response Status:", response.status);
+                // console.log("Response Headers:", Object.fromEntries(response.headers.entries()));
+
+                if (!response.ok) {
+                    let errorMsg = `サーバーエラー (${response.status})`;
+                    try {
+                        // FastAPIからの詳細エラーメッセージ (JSON形式) を期待
+                        const errorData = await response.json();
+                        errorMsg = `エラー: ${errorData.detail || JSON.stringify(errorData)}`;
+                    } catch (e) {
+                        // JSONでなければテキストで試す
+                        try {
+                             const textError = await response.text();
+                             if (textError) errorMsg = textError; // エラーテキストがあれば表示
+                        } catch (ee) {
+                             // それも失敗したらステータスコードのみ
+                             console.error("Could not parse error response body", ee);
+                        }
+                    }
+                    // タイムアウト (504 Gateway Timeout) の場合のメッセージ
+                    if (response.status === 504) {
+                         errorMsg = "エラー: サーバー処理がタイムアウトしました。動画が長すぎるか、サーバーが混み合っている可能性があります。(Vercel Hobbyプランの制限の可能性あり)";
+                    }
+                     if (response.status === 507) {
+                          errorMsg = "エラー: サーバーのストレージ容量が不足しています。";
+                     }
+                    throw new Error(errorMsg);
+                }
+
+                // Content-Disposition ヘッダーからファイル名を取得
+                const contentDisposition = response.headers.get('content-disposition');
+                let filename = 'audio.m4a'; // デフォルト
+                if (contentDisposition) {
+                    // より堅牢なファイル名抽出 (クォートやエンコーディングに対応する可能性を考慮)
+                    const filenameRegex = /filename\*?=['"]?(?:UTF-\d['"]*)?([^;\r\n"']*)['"]?;?/i;
+                    const match = contentDisposition.match(filenameRegex);
+                    if (match && match[1]) {
+                        // URLデコードが必要な場合がある (例: filename*=UTF-8''...)
+                        try {
+                             filename = decodeURIComponent(match[1]);
+                        } catch (e) {
+                             filename = match[1]; // デコード失敗時はそのまま使う
+                             console.warn("Could not decode filename from Content-Disposition:", match[1]);
+                        }
+                    }
+                }
+                console.log("Download filename:", filename);
+
+                showStatus('ダウンロード中...', 'info');
+
+                // Blobとして取得し、ダウンロードリンクを作成
+                const blob = await response.blob();
+
+                // Content-Typeが期待通りか確認 (オプション)
+                if (blob.type !== 'audio/m4a' && blob.type !== 'application/octet-stream') {
+                     console.warn(`Unexpected Content-Type: ${blob.type}. Expected audio/m4a.`);
+                     // 必要であればここでエラー処理
+                }
+
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+
+                a.click(); // ダウンロードダイアログを表示
+
+                // 後片付け
+                window.URL.revokeObjectURL(downloadUrl);
+                document.body.removeChild(a);
+
+                showStatus(`'${filename}' のダウンロードを開始しました。`, 'success');
+                urlInput.value = ''; // 成功したら入力欄をクリア
+
+            } catch (error) {
+                console.error('Download failed:', error);
+                showStatus(error.message || '不明なエラーが発生しました。', 'error');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        function showStatus(message, type = 'info') {
+            statusDiv.textContent = message;
+            statusDiv.className = type; // error, success, info
+            statusDiv.style.display = 'block'; // 表示する
+        }
+
+        function setLoading(isLoading) {
+            button.disabled = isLoading;
+            urlInput.disabled = isLoading; // 入力欄も無効化
+            if (isLoading) {
+                loader.style.display = 'inline-block';
+                buttonText.textContent = '処理中'; // テキストを変更
+            } else {
+                loader.style.display = 'none';
+                buttonText.textContent = 'm4aをダウンロード'; // テキストを元に戻す
+            }
+        }
+    </script>
+</body>
+</html>
