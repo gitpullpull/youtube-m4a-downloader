@@ -1,2 +1,7 @@
 # Python virtual environment
 venv/
+.vercel
+.DS_Store
+**/.DS_Store
+/tmp/*
+!/tmp/.gitkeep
