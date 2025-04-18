@@ -5,3 +5,6 @@ venv/
 **/.DS_Store
 /tmp/*
 !/tmp/.gitkeep
+__pycache__/
+*.py[cod]
+*$py.class
