@@ -14,6 +14,24 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+#vercel環境か確認
+def is_vercel_environment():
+    return os.environ.get("VERCEL") == "1" or bool(os.environ.get("VERCEL_URL"))
+
+#cookieの取得
+#vercel環境か否かによってパスを変更
+def get_cookie_path():
+    if is_vercel_environment():
+        return '/var/task/cookie.txt'
+    else:
+        return 'cookie.txt'
+
+cookie_path = get_cookie_path()
+
+if not os.path.exists(cookie_path):
+    logger.warning(f"Cookie file not found at: {cookie_path}")
+
+#FastAPI
 app = FastAPI()
 
 # --- HTMLテンプレートの設定 ---
@@ -47,7 +65,8 @@ YDL_OPTS_BASE = {
     'http_chunk_size': 10485760, # 10MBチャンク
     'verbose': True, # デバッグ時に有効化
     'logger': logger, # yt-dlpのログをFastAPIのロガーに出力する場合
-    'ffmpeg_location': None
+    'ffmpeg_location': None,
+    'cookiefile': cookie_path
     }
 
 def sanitize_filename(filename):
@@ -172,7 +191,7 @@ async def file_streamer(file_path: str):
 # --- APIエンドポイント ---
 @app.get("/api/download")
 async def download_endpoint(url: str = Query(..., min_length=10, description="YouTube Video URL")):
-    # より厳密なURL検証 (オプション)
+    #より厳密なURL検証
     if not re.match(r"^(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/)[\w-]+(&\S*)?$", url):
         logger.warning(f"Invalid YouTube URL format received: {url}")
         raise HTTPException(status_code=400, detail="Invalid YouTube URL format. Please use a valid video URL (e.g., https://www.youtube.com/watch?v=...).")
@@ -214,6 +233,3 @@ async def read_root(request: Request):
          return HTMLResponse("Server configuration error: Could not load page template.", status_code=500)
     logger.info(f"Serving index.html for request path: {request.url.path}")
     return templates.TemplateResponse("index.html", {"request": request})
-
-# Vercelでは、uvicornを直接起動する必要はありません。
-# FastAPIインスタンス `app` が検出され、ASGIサーバーで実行されます。
