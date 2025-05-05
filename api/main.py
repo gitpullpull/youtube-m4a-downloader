@@ -103,8 +103,7 @@ async def download_audio(url: str):
                 None, lambda: ydl.extract_info(url, download=False)
             )
             video_title = info_dict.get('title', 'audio')
-            video_id = info_dict.get('id', 'unknown_id')
-            filename = sanitize_filename(f"{video_title}_{video_id}.m4a")
+            filename = sanitize_filename(f"{video_title}.m4a")
             logger.info(f"Determined filename: {filename}")
 
             logger.info(f"Downloading audio to: {outtmpl_base}.m4a (yt-dlp will set ext)")
@@ -204,14 +203,15 @@ async def download_endpoint(url: str = Query(..., min_length=10, description="Yo
         import urllib.parse
         quoted_filename = urllib.parse.quote(download_filename)
         headers = {
-            # ASCIIのみのfilenameと、UTF-8のfilename*を両方指定
-            'Content-Disposition': f'attachment; filename="download.m4a"; filename*=UTF-8''{quoted_filename}',
+            # 日本語ファイル名対応: ASCII用filenameとUTF-8用filename*を両方指定
+            'Content-Disposition': f'attachment; filename="{quoted_filename}"; filename*=UTF-8''{quoted_filename}',
             'Content-Type': 'audio/m4a',
-            'Content-Length': str(file_size) # Content-Length を追加
+            'Content-Length': str(file_size)
         }
         return StreamingResponse(
             file_streamer(temp_file_path),
             headers=headers
+
         )
 
     except HTTPException as e:
