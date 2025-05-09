@@ -66,8 +66,13 @@ YDL_OPTS_BASE = {
     'verbose': True, # デバッグ時に有効化
     'logger': logger, # yt-dlpのログをFastAPIのロガーに出力する場合
     'ffmpeg_location': None,
-    'cookiefile': cookie_path
-    }
+    'cookiefile': cookie_path,
+    'writethumbnail': True, # サムネイルを書き出す
+    'postprocessors': [{
+        'key': 'EmbedThumbnail',
+        'already_have_thumbnail': False,
+    }],
+}
 
 def sanitize_filename(filename):
     """ファイル名として不適切な文字を除去または置換する"""
@@ -78,7 +83,7 @@ def sanitize_filename(filename):
     #sanitized = filename
     #return sanitized
 
-async def download_audio(url: str):
+async def download_audio(url: str, embed_thumbnail: bool = False): # embed_thumbnail パラメータを追加
     temp_dir = pathlib.Path(__file__).parent.parent / "tmp"
     try:
         temp_dir.mkdir(parents=True, exist_ok=True)
@@ -94,7 +99,13 @@ async def download_audio(url: str):
     opts = YDL_OPTS_BASE.copy()
     opts['outtmpl'] = outtmpl_base + ".%(ext)s"
 
+    if not embed_thumbnail: # サムネイルを埋め込まない場合
+        opts['postprocessors'] = []
+        opts['writethumbnail'] = False
+
     loop = asyncio.get_event_loop()
+    actual_m4a_path = outtmpl_base + ".m4a" # Define actual_m4a_path here
+
     try:
         logger.info(f"Starting download for URL: {url}")
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -109,7 +120,6 @@ async def download_audio(url: str):
             logger.info(f"Downloading audio to: {outtmpl_base}.m4a (yt-dlp will set ext)")
             await loop.run_in_executor(None, lambda: ydl.download([url]))
 
-            actual_m4a_path = outtmpl_base + ".m4a"
             if not os.path.exists(actual_m4a_path) or os.path.getsize(actual_m4a_path) == 0:
                 logger.error(f"Downloaded file not found or empty: {actual_m4a_path}")
                 if os.path.exists(actual_m4a_path):
@@ -122,6 +132,13 @@ async def download_audio(url: str):
 
     except yt_dlp.utils.DownloadError as e:
         logger.error(f"yt-dlp Download Error for {url}: {e}", exc_info=True)
+        # Attempt to remove the potentially partially downloaded file
+        if os.path.exists(actual_m4a_path):
+            try:
+                os.remove(actual_m4a_path)
+                logger.info(f"Removed temporary file due to download error: {actual_m4a_path}")
+            except OSError as remove_err:
+                logger.error(f"Error removing temporary file {actual_m4a_path} after download error: {remove_err}")
         if "video unavailable" in str(e).lower():
             raise HTTPException(status_code=404, detail="Video not found or unavailable.")
         elif "ffmpeg" in str(e).lower():
@@ -131,12 +148,12 @@ async def download_audio(url: str):
     except yt_dlp.utils.ExtractorError as e:
         logger.error(f"yt-dlp Download Error for {url}: {e}", exc_info=True)
         # エラー時には一時ファイルを削除しようとする
-        if os.path.exists(m4a_temp_path):
+        if os.path.exists(actual_m4a_path): # Use actual_m4a_path
             try:
-                os.remove(m4a_temp_path)
-                logger.info(f"Removed temporary file due to download error: {m4a_temp_path}")
+                os.remove(actual_m4a_path) # Use actual_m4a_path
+                logger.info(f"Removed temporary file due to download error: {actual_m4a_path}") # Use actual_m4a_path
             except OSError as remove_err:
-                logger.error(f"Error removing temporary file {m4a_temp_path} after download error: {remove_err}")
+                logger.error(f"Error removing temporary file {actual_m4a_path} after download error: {remove_err}") # Use actual_m4a_path
 
         # エラーメッセージに基づいて適切なHTTPステータスコードを返す
         err_str = str(e).lower()
@@ -156,12 +173,12 @@ async def download_audio(url: str):
 
     except Exception as e:
         logger.exception(f"Unexpected Error during download for {url}: {e}")
-        if os.path.exists(m4a_temp_path):
+        if os.path.exists(actual_m4a_path): # Use actual_m4a_path
              try:
-                os.remove(m4a_temp_path)
-                logger.info(f"Removed temporary file due to unexpected error: {m4a_temp_path}")
+                os.remove(actual_m4a_path) # Use actual_m4a_path
+                logger.info(f"Removed temporary file due to unexpected error: {actual_m4a_path}") # Use actual_m4a_path
              except OSError as remove_err:
-                logger.error(f"Error removing temporary file {m4a_temp_path} after unexpected error: {remove_err}")
+                logger.error(f"Error removing temporary file {actual_m4a_path} after unexpected error: {remove_err}") # Use actual_m4a_path
         raise HTTPException(status_code=500, detail=f"An unexpected server error occurred: {str(e)}")
 
 
@@ -189,7 +206,7 @@ async def file_streamer(file_path: str):
 
 # --- APIエンドポイント ---
 @app.get("/api/download")
-async def download_endpoint(url: str = Query(..., min_length=10, description="YouTube Video URL")):
+async def download_endpoint(url: str = Query(..., min_length=10, description="YouTube Video URL"), embed_thumbnail: bool = Query(False, description="Embed thumbnail into the audio file")): # embed_thumbnail パラメータを追加
     #より厳密なURL検証
     if not re.match(r"^(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/)[\w-]+(&\S*)?$", url):
         logger.warning(f"Invalid YouTube URL format received: {url}")
@@ -197,7 +214,7 @@ async def download_endpoint(url: str = Query(..., min_length=10, description="Yo
 
     try:
         # ダウンロードを実行し、一時ファイルのパス、ファイル名、サイズを取得
-        temp_file_path, download_filename, file_size = await download_audio(url)
+        temp_file_path, download_filename, file_size = await download_audio(url, embed_thumbnail) # embed_thumbnail を渡す
 
         # ストリーミングレスポンスを返す
         import urllib.parse

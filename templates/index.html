@@ -108,6 +108,10 @@
     <p>動画のURLを記入してください</p>
     <form id="downloadForm">
         <input type="text" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." required>
+        <div style="margin-top: 10px; margin-bottom: 10px; width: 100%; text-align: center;">
+            <input type="checkbox" id="embedThumbnail" name="embedThumbnail" style="margin-right: 5px;">
+            <label for="embedThumbnail">サムネイルを埋め込む</label>
+        </div>
         <button type="submit" id="downloadButton">
             <span>m4aをダウンロード</span>
             <div class="loader" id="loader"></div>
@@ -122,10 +126,12 @@
         const buttonText = button.querySelector('span'); // ボタン内のテキスト要素
         const statusDiv = document.getElementById('status');
         const loader = document.getElementById('loader');
+        const embedThumbnailCheckbox = document.getElementById('embedThumbnail'); // チェックボックスを取得
 
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
             const url = urlInput.value.trim();
+            const embedThumbnail = embedThumbnailCheckbox.checked; // チェックボックスの状態を取得
 
             if (!url) {
                 showStatus('URLを入力してください。', 'error');
@@ -143,7 +149,10 @@
 
             try {
                 // APIエンドポイント (api/main.pyで定義したパス)
-                const apiUrl = `/api/download?url=${encodeURIComponent(url)}`;
+                let apiUrl = `/api/download?url=${encodeURIComponent(url)}`;
+                if (embedThumbnail) {
+                    apiUrl += `&embed_thumbnail=true`; // サムネイル埋め込みパラメータを追加
+                }
                 console.log("Requesting URL:", apiUrl);
 
                 const response = await fetch(apiUrl);
@@ -180,7 +189,7 @@
                 const contentDisposition = response.headers.get('content-disposition');
                 let filename = 'audio.m4a'; // デフォルト
                 if (contentDisposition) {
-                    // より堅牢なファイル名抽出 (クォートやエンコーディングに対応する可能性を考慮)
+                    // クォートやエンコーディングに対応する可能性を考慮
                     const filenameRegex = /filename\*?=['"]?(?:UTF-\d['"]*)?([^;\r\n"']*)['"]?;?/i;
                     const match = contentDisposition.match(filenameRegex);
                     if (match && match[1]) {
