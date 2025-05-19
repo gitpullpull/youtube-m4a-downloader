@@ -4,120 +4,248 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My YouTube m4a Downloader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            padding: 20px;
-            max-width: 700px;
-            margin: 40px auto;
-            background-color: #f4f7f6;
-            color: #333;
-            line-height: 1.6;
-        }
-        h1 {
-            color: #2c3e50;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        p {
-            text-align: center;
-            margin-bottom: 25px;
-            color: #555;
-        }
-        #downloadForm {
-            display: flex;
-            flex-wrap: wrap; /* 小画面での折り返し */
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 25px;
-        }
-        input[type="text"] {
-            flex-grow: 1; /* スペースを埋めるように伸びる */
-            padding: 12px 15px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 1rem;
-            min-width: 250px; /* 最小幅 */
-            margin-right: 10px;
-             margin-bottom: 10px; /* 折り返し時のマージン */
-        }
-        button {
-            padding: 12px 20px;
-            background-color: #3498db;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: background-color 0.3s ease;
-            display: inline-flex; /* ローダーを隣に表示するため */
-            align-items: center;
-             margin-bottom: 10px; /* 折り返し時のマージン */
-        }
-        button:hover:not(:disabled) {
-            background-color: #2980b9;
-        }
-        button:disabled {
-            background-color: #a9cce3;
-            cursor: not-allowed;
-        }
-        #status {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 4px;
-            text-align: center;
-            font-weight: bold;
-            display: none; /* 最初は非表示 */
-        }
-        .info { background-color: #eaf2f8; color: #3498db; border: 1px solid #aed6f1; }
-        .success { background-color: #e8f8f5; color: #1abc9c; border: 1px solid #a3e4d7; }
-        .error { background-color: #fdedec; color: #e74c3c; border: 1px solid #f5b7b1; }
-        .loader {
-            border: 4px solid #f3f3f3; /* Light grey */
-            border-top: 4px solid #3498db; /* Blue */
-            border-radius: 50%;
-            width: 18px;
-            height: 18px;
-            animation: spin 1.5s linear infinite;
-            display: none; /* Initially hidden */
-            margin-left: 8px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        :root {
+            --primary: #111111;
+            --primary-lighter: #333333;
+            --primary-hover: #000000;
+            --accent: #ff4d4d;
+            --background: #ffffff;
+            --card-bg: #ffffff;
+            --text: #111111;
+            --text-light: #555555;
+            --border: #e0e0e0;
+            --success: #47a025;
+            --info: #2563eb;
+            --error: #e11d48;
+            --transition: all 0.2s ease;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
         }
 
-        @media (max-width: 600px) {
-            #downloadForm {
-                flex-direction: column;
-                align-items: stretch; /* 幅いっぱいに */
-            }
-            input[type="text"] {
-                margin-right: 0;
-                margin-bottom: 15px; /* ボタンとの間隔 */
-            }
-             button {
-                width: 100%; /* 幅いっぱいに */
-                justify-content: center; /* テキストとローダーを中央揃え */
-             }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.025em;
+        }
+
+        p {
+            color: var(--text-light);
+            font-size: 0.95rem;
+            margin-bottom: 2rem;
+        }
+
+        #downloadForm {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            color: var(--text);
+            transition: var(--transition);
+            background: transparent;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        input[type="text"]::placeholder {
+            color: #aaa;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            position: absolute;
+            opacity: 0;
+        }
+
+        .checkbox-custom {
+            width: 18px;
+            height: 18px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin-right: 8px;
+            position: relative;
+            transition: var(--transition);
+        }
+
+        .checkbox-wrapper input[type="checkbox"]:checked ~ .checkbox-custom {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .checkbox-custom::after {
+            content: '';
+            position: absolute;
+            display: none;
+            left: 6px;
+            top: 2px;
+            width: 4px;
+            height: 9px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        .checkbox-wrapper input[type="checkbox"]:checked ~ .checkbox-custom::after {
+            display: block;
+        }
+
+        .checkbox-label {
+            font-size: 0.95rem;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+        }
+
+        button:disabled {
+            background-color: var(--primary-lighter);
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 1.5rem;
+            padding: 0.875rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: none;
+        }
+
+        .info { 
+            background-color: rgba(37, 99, 235, 0.08);
+            color: var (--info);
+            border-left: 3px solid var(--info);
+        }
+
+        .success { 
+            background-color: rgba(71, 160, 37, 0.08); 
+            color: var(--success);
+            border-left: 3px solid var(--success);
+        }
+
+        .error { 
+            background-color: rgba(225, 29, 72, 0.08);
+            color: var(--error);
+            border-left: 3px solid var(--error);
+        }
+
+        .loader {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            display: none;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        footer {
+            margin-top: 3rem;
+            color: var(--text-light);
+            font-size: 0.8rem;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <h1>YouTube m4a Downloader</h1>
-    <p>動画のURLを記入してください</p>
-    <form id="downloadForm">
-        <input type="text" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." required>
-        <div style="margin-top: 10px; margin-bottom: 10px; width: 100%; text-align: center;">
-            <input type="checkbox" id="embedThumbnail" name="embedThumbnail" style="margin-right: 5px;">
-            <label for="embedThumbnail">サムネイルを埋め込む</label>
-        </div>
-        <button type="submit" id="downloadButton">
-            <span>m4aをダウンロード</span>
-            <div class="loader" id="loader"></div>
-        </button>
-    </form>
-    <div id="status"></div>
+    <div class="container">
+        <h1>YouTube m4a Downloader</h1>
+                <form id="downloadForm">
+            <div class="input-wrapper">
+                <input type="text" id="youtubeUrl" placeholder="YouTubeのURL" required>
+            </div>
+            <div class="checkbox-container">
+                <label class="checkbox-wrapper">
+                    <input type="checkbox" id="embedThumbnail" name="embedThumbnail">
+                    <span class="checkbox-custom"></span>
+                    <span class="checkbox-label">サムネイルを埋め込む</span>
+                </label>
+            </div>
+            <button type="submit" id="downloadButton">
+                <span>ダウンロード</span>
+                <div class="loader" id="loader"></div>
+            </button>
+        </form>
+        <div id="status"></div>
+    </div>
+
+    
 
     <script>
         const form = document.getElementById('downloadForm');
