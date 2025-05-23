@@ -1,6 +1,7 @@
 # /api/main.py
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import yt_dlp
 import asyncio
@@ -51,10 +52,26 @@ except Exception as e:
     logger.exception("Error setting up Jinja2Templates")
     templates = None
 
+try:
+    static_dir = pathlib.Path(__file__).parent.parent / "static"
+    if not static_dir.is_dir():
+        logger.warning(f"Static directory not found at: {static_dir}")
+        # ローカル開発時の代替パス
+        static_dir = pathlib.Path("static")
+        if not static_dir.is_dir():
+            raise RuntimeError("Static directory not found at expected locations.")
+    logger.info(f"Static directory set to: {static_dir}")
+except Exception as e:
+    logger.exception("Error setting up static directory")
+    static_dir = None
+
+
+
 
 # --- yt-dlpとダウンロード関連 ---
 # yt-dlpオプション: ffmpeg不要のm4a (format 140等), 一時ファイルへ出力
 # フォーマット'140'は多くの場合 m4a 128kbps (AAC) でffmpeg不要
+
 YDL_OPTS_BASE = {
     'format': '140/bestaudio[ext=m4a]/bestaudio', # 140を優先、なければm4a、それもなければベストな音声
     'noprogress': True,
@@ -250,3 +267,12 @@ async def read_root(request: Request):
          return HTMLResponse("Server configuration error: Could not load page template.", status_code=500)
     logger.info(f"Serving index.html for request path: {request.url.path}")
     return templates.TemplateResponse("index.html", {"request": request})
+
+# favicon.icoのエンドポイント
+# Vercel環境では/var/task/static/favicon.icoに配置される
+# ローカル開発時はプロジェクトルートのstatic/favicon.icoを使用
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse(str(static_dir / "favicon.ico"))
